@@ -6,45 +6,32 @@ import {
   HttpException,
   HttpStatus,
   Param,
-  ParseIntPipe,
   Post,
   Query,
   Redirect,
-  UsePipes,
 } from '@nestjs/common';
 import { CreateCatDTO } from './create-cat.dto';
 import { CatsService } from './cats.service';
-import { Cat } from 'src/interfaces/cat.interface';
-import { ZodValidationPipe } from 'src/pipes/zodValidation.pipe';
-import { CreateCatDto, createCatSchema } from 'src/schema/createCatSchema';
+import { PrismaClient } from '@prisma/client';
 
+const prisma = new PrismaClient();
 @Controller('cats')
 export class CatsController {
   constructor(private catsService: CatsService) {}
 
+  // curl http://localhost:3000/cats -H "Content-Type: application/json" -X POST -d '{"name":"Poko","age":1, "breed":"British Shorthair","ownerId":"657eb35d5405062704e4ad74"}'
   @Post()
   @HttpCode(204)
-  create(@Body() createCatDTO: CreateCatDTO): void {
-    return this.catsService.create(createCatDTO);
-  }
-
-  @Post('/create')
-  @UsePipes(new ZodValidationPipe(createCatSchema))
-  async create2(@Body() createCatDto: CreateCatDto) {
-    this.catsService.create(createCatDto);
-  }
-
-  @Get()
-  findAll(): Cat[] {
+  async create(@Body() createCatDTO: CreateCatDTO) {
     try {
-      return this.catsService.findAll();
+      return await prisma.cat.create({
+        data: createCatDTO,
+      });
     } catch (error) {
+      console.log(error);
       throw new HttpException(
-        {
-          status: HttpStatus.FORBIDDEN,
-          error: 'This is a custom message',
-        },
-        HttpStatus.FORBIDDEN,
+        'Something went wrong with creating a cat',
+        HttpStatus.BAD_REQUEST,
         {
           cause: error,
         },
@@ -52,6 +39,28 @@ export class CatsController {
     }
   }
 
+  @Get()
+  async findAll() {
+    try {
+      return await prisma.cat.findMany({
+        include: {
+          owner: true,
+        },
+      });
+    } catch (error) {
+      console.log(error);
+      throw new HttpException(
+        'Something went wrong with finding cats',
+        HttpStatus.BAD_REQUEST,
+        {
+          cause: error,
+        },
+      );
+    }
+  }
+
+  // http://localhost:3000/cats/redirect
+  // http://localhost:3000/cats/redirect?version=5
   @Get('redirect')
   @Redirect('/cats', 301)
   redirect(@Query('version') version: string) {
@@ -60,15 +69,33 @@ export class CatsController {
     }
   }
 
+  // http://localhost:3000/cats/6583d1aeb39c25d3000f3fbe
   @Get(':id')
-  findOne(
+  async findOne(
     @Param(
       'id',
-      new ParseIntPipe({ errorHttpStatusCode: HttpStatus.NOT_ACCEPTABLE }),
+      // new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.NOT_ACCEPTABLE }),
     )
     id: string,
-  ): string {
-    console.log(id);
-    return 'This action return one cat';
+  ) {
+    try {
+      return await prisma.cat.findUnique({
+        where: {
+          id: id,
+        },
+        include: {
+          owner: true,
+        },
+      });
+    } catch (error) {
+      console.log(error);
+      throw new HttpException(
+        'Something went wrong with finding a cat with id: ' + id,
+        HttpStatus.BAD_REQUEST,
+        {
+          cause: error,
+        },
+      );
+    }
   }
 }

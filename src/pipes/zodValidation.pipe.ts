@@ -3,7 +3,7 @@ import { ZodObject } from 'zod';
 
 export class ZodValidationPipe implements PipeTransform {
   constructor(private schema: ZodObject<any>) {}
-  transform(value: unknown, metadata: ArgumentMetadata) {
+  transform(value: unknown) {
     try {
       this.schema.parse(value);
     } catch (error) {
